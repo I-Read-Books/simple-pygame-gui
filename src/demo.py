@@ -1,8 +1,7 @@
 import pygame
 import sys
 from scripts.ui_elements.ui_element import UIElement
-from scripts.ui_elements.ui_interactive_element import UIInteractiveElement
-from scripts.ui_elements.button import Button
+from scripts.ui_elements.element_functions import ButtonFunction
 from ui_manager import UIManager
 
 class Demo:
@@ -14,24 +13,28 @@ class Demo:
 
         self.ui_manager = UIManager()
         self.element = UIElement(pygame.Rect(200, 200, 200, 200), self.ui_manager, 'box')
+        self.element.add_functionality(ButtonFunction(self.message, ['hello']))
+
         self.element2 = UIElement(pygame.Rect(20, 20, 20, 20), self.ui_manager, 'ron', surface=pygame.Surface((20, 20), masks=(20, 20, 20)))
-        self.element3 = UIInteractiveElement(pygame.Rect(300, 30, 50, 50), self.ui_manager, 'interactive')
-        self.button = Button(pygame.Rect(100, 100, 30, 30), self.ui_manager, 'button', self.message, ['hello'])
     
     def run(self) -> None:
         while True:
             frame_time = self.clock.tick(60)
             mouse_pos = pygame.mouse.get_pos()
 
+            mouse_just_pressed = False
+            mouse_just_released = False
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     sys.exit()
                 
-                self.ui_manager.handle_mouse_event(mouse_pos, event.type==pygame.MOUSEBUTTONDOWN, event.type==pygame.MOUSEBUTTONUP)
-                    
+                mouse_just_pressed = event.type == pygame.MOUSEBUTTONDOWN
+                mouse_just_released = event.type == pygame.MOUSEBUTTONUP
+
             self.screen.fill((255, 255, 255))
             
-            self.ui_manager.update(frame_time / 1000) # seconds
+            self.ui_manager.update(mouse_pos, mouse_just_pressed, mouse_just_released, frame_time / 1000) # seconds
             self.ui_manager.render_all(self.screen)
 
             pygame.display.flip()
