@@ -1,10 +1,8 @@
 from __future__ import annotations
 import pygame
 from warnings import warn
-from abc import ABC, abstractmethod
-from typing import Optional, Self
+from typing import Optional
 from scripts.ui_elements.element_metrics import ElementMetrics
-from scripts.ui_elements.element_functions import ElementFunction
 
 class UIElement:
     def __init__(
@@ -19,15 +17,14 @@ class UIElement:
 
         self.position_rect = position_rect
 
-        self.metrics = ElementMetrics(
-            self.position_rect
-        )
+        self.metrics = ElementMetrics(self.position_rect)
 
-        if surface and surface.size != position_rect.size:
-            warn(f'Surface size does not match rect size: id={element_id}')
-        self.surface = surface if surface is not None else pygame.Surface(self.position_rect.size)
-            
-        self.children = children
+        self.surface = surface if surface else pygame.Surface(self.position_rect.size)
+        if surface and surface.get_size() != self.position_rect.size:
+            warn(f'Surface of element {element_id} does not match rect size... \n resizing to fit')
+            self.surface = pygame.transform.smoothscale(surface, self.position_rect.size)
+        
+        self.children = children.copy()
 
         self.id = element_id
         self.render_layer = render_layer
@@ -35,14 +32,14 @@ class UIElement:
         self.ui_manager = ui_manager
         self.ui_manager.add_element(self)
 
-        self.functions = []
-
+        self.collision_function = self.position_rect.collidepoint
+        
     @property
     def topleft(self) -> tuple:
         return self.position_rect.topleft
     @topleft.setter
     def topleft(self, new_topleft: tuple) -> None:
-        self._move_children(self.position_rect.topleft[0] - new_topleft[0], self.position_rect.topleft[1] - new_topleft[1])
+        self._move_children(self.position_rect.topleft[0] - new_topleft[0], new_topleft[1] - self.position_rect.topleft[1])
         self.position_rect.topleft = new_topleft
     
     @property
@@ -69,43 +66,58 @@ class UIElement:
     def top(self) -> int:
         return self.position_rect.top
     
-    def add_functionality(self, function: ElementFunction) -> None:
-        assert issubclass(function.__class__, ElementFunction)
-        self.functions.append(function)
-
     def move(self, delta_x: int, delta_y: int) -> None:
-        self.topleft = (self.topleft[0] + delta_x, self.topleft[1] + delta_y)
+        self.topleft = (self.position_rect.topleft[0] + delta_x, self.position_rect.topleft[1] + delta_y)
     
     def _move_children(self, delta_x: int, delta_y: int) -> None:
         for child in self.children:
             child.move(delta_x, delta_y)
+    
+    def add_child(self, element: UIElement) -> None:
+        self.children.append(element)
+        
+    def set_color(self, rgb: tuple) -> None:
+        self.color = rgb
 
-    def _handle_mouse_event(self, mouse_pos: tuple, just_pressed: bool, just_released: bool) -> None:
+    def _handle_mouse(self, mouse_pos: tuple, just_pressed: bool, just_released: bool) -> None:
         mouse_collides = self.collide_point(mouse_pos)
 
         if mouse_collides and just_pressed:
             self.metrics.holding = True
+        if just_pressed:
+            #print('pressed')
+            ...
         if just_released:
+            #print('released')
             self.metrics.holding = False
+
+        self.metrics.prev_mouse_pos = self.metrics.curr_mouse_pos
+        self.metrics.curr_mouse_pos = mouse_pos
+        
+        self.metrics.prev_mouse_col_pos = self.metrics.curr_mouse_col_pos
+        self.metrics.curr_mouse_col_pos = mouse_pos if mouse_collides else None
 
         self.metrics.hovering = mouse_collides
         self.metrics.just_pressed = mouse_collides and just_pressed
         self.metrics.just_released = mouse_collides and just_released
 
     def collide_point(self, point: tuple) -> bool:
-        return self.position_rect.collidepoint(point)
+        return self.collision_function(point)
 
     def update(self, mouse_pos: tuple, just_pressed: bool, just_released: bool, delta_time: float) -> None:
-        self._handle_mouse_event(mouse_pos, just_pressed, just_released)
+        self._handle_mouse(mouse_pos, just_pressed, just_released)
 
-        self.metrics.time_holding += delta_time if self.metrics.holding else 0
-        self.metrics.time_hovering += delta_time if self.metrics.hovering else 0
+        self.metrics.time_holding += delta_time if self.metrics.holding else -self.metrics.time_holding
+        self.metrics.time_hovering += delta_time if self.metrics.hovering else -self.metrics.time_hovering
 
-        for function in self.functions:
-            function.execute(self.metrics)
+        self._update(mouse_pos, just_pressed, just_released, delta_time)
+
+    def _update(self, mouse_pos: tuple, just_pressed: bool, just_released: bool, delta_time: float) -> None:
+        ...
             
-        self.surface.fill((min(int(self.metrics.time_holding * 80), 255), min(int(self.metrics.time_hovering * 80), 255), 0))
-
     def render(self, dest_surf: pygame.Surface) -> None:
         dest_surf.blit(self.surface, self.topleft)
+
+    def __repr__(self) -> str:
+        return f'UiElement id \'{self.id}\' at topleft {self.topleft}'
         

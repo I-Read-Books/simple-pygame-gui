@@ -13,5 +13,7 @@ class ElementMetrics:
     just_pressed: bool = False
     just_released: bool = False
 
-    prev_frame_mouse_col_pos: Optional[tuple] = None
-    curr_frame_mouse_col_pos: Optional[tuple] = None
+    prev_mouse_pos: tuple = (0, 0)
+    curr_mouse_pos: tuple = (0, 0)
+    prev_mouse_col_pos: Optional[tuple] = None
+    curr_mouse_col_pos: Optional[tuple] = None
